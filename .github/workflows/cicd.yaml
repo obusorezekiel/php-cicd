@@ -24,9 +24,12 @@ jobs:
         ls -l ~/.ssh  # Debugging: list files in .ssh to confirm id_rsa creation
 
     - name: Test SSH connection
+      env:
+        EC2_USER: ${{ secrets.EC2_USER }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
         echo "Testing SSH connection to EC2..."
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -v ${EC2_USER}@${EC2_HOST} "echo 'SSH connection successful'"
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo 'SSH connection successful'"
 
     - name: Deploy application to EC2
       env:
