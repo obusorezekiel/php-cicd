@@ -35,7 +35,7 @@ jobs:
         echo "Deploying application to EC2 instance..."
 
         # Copy files to the EC2 instance
-        rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
+        sudo rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
 
         # Run deployment tasks on the EC2 instance
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
