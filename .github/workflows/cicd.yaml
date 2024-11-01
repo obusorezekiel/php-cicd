@@ -41,7 +41,7 @@ jobs:
         DB_USER: ${{ secrets.DB_USER }}
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
-        echo "Deploying application to EC2 instance..."
+        echo "Deploying application to EC2 instance"
     
         # Ensure target directory permissions are correct before deployment
         ssh -i "${{ runner.temp }}/id_rsa" -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "sudo mkdir -p ${EC2_PATH} && sudo chown -R ${EC2_USER}:${EC2_USER} ${EC2_PATH}"
