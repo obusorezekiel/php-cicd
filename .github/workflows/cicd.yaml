@@ -16,10 +16,11 @@ jobs:
     - name: Install dependencies
       run: composer install
 
-    - name: Set up SSH
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    - name: Set up SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
 
     - name: Deploy application to EC2
       env:
@@ -32,14 +33,13 @@ jobs:
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
         echo "Deploying application to EC2 instance..."
-      
+
         # Copy files to the EC2 instance
-        sudo rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i ${{ secrets.SSH_PRIVATE_KEY }} -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
-      
+        rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
+
         # Run deployment tasks on the EC2 instance
-        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
-    
-        if [ ! -f ${EC2_PATH}/.env ]; then
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
+          if [ ! -f ${EC2_PATH}/.env ]; then
             cp ${EC2_PATH}/.env.example ${EC2_PATH}/.env
             echo "DB_HOST=${DB_HOST}" >> ${EC2_PATH}/.env
             echo "DB_NAME=${DB_NAME}" >> ${EC2_PATH}/.env
@@ -48,7 +48,7 @@ jobs:
           else
             echo ".env file already exists, skipping creation."
           fi
-      
+
           # Set permissions for the deployment
           sudo chown -R www-data:www-data ${EC2_PATH}
           sudo chmod -R 755 ${EC2_PATH}
@@ -61,5 +61,4 @@ jobs:
           
           # Restart Apache or PHP-FPM if necessary (depending on your server setup)
           sudo systemctl restart apache2
-          EOF
-      
+        EOF
