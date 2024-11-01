@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to EC2 with SSH Key Debug
 
 on:
   push:
@@ -13,21 +13,35 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Prepare SSH Key
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        # Create SSH directory
+        mkdir -p ~/.ssh
+        
+        # Ensure correct key format - strip any potential extra text
+        echo "$SSH_PRIVATE_KEY" | sed -e 's/^[[:space:]"]*//' -e 's/[[:space:]"]*$//' > ~/.ssh/id_rsa
+        
+        # Set strict permissions
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Debug: Show key details (without revealing content)
+        ssh-keygen -lf ~/.ssh/id_rsa || echo "Key validation failed"
+
     - name: Install dependencies
       run: composer install
 
-    - name: Set up SSH
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-    - name: Verify SSH Connection
+    - name: Test SSH Connection
       env:
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USER: ${{ secrets.EC2_USER }}
       run: |
-        # Attempt SSH connection with verbose output
-        ssh -vvv -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} exit
+        # Verbose SSH connection test
+        ssh -vvv \
+            -o StrictHostKeyChecking=no \
+            -i ~/.ssh/id_rsa \
+            ${EC2_USER}@${EC2_HOST} exit
 
     - name: Deploy application to EC2
       env:
@@ -37,23 +51,22 @@ jobs:
       run: |
         echo "Deploying application to EC2 instance..."
 
-        # Verify SSH key is added to ssh-agent
-        ssh-add -l
+        # Use explicit key file in rsync and ssh commands
+        rsync -avz \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+            --exclude '.env' \
+            --exclude '.git' \
+            ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
 
-        # Use verbose rsync to diagnose connection issues
-        sudo rsync -avvz --exclude '.env' --exclude '.git' \
-          -e "ssh -o StrictHostKeyChecking=no" \
-          ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
-
-        # Run deployment tasks on the EC2 instance
-        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
-        set -x  # Enable debug mode
-        whoami  # Verify current user
-        pwd     # Verify current directory
+        # Deploy commands with explicit key
+        ssh -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            ${EC2_USER}@${EC2_HOST} << EOF
+        set -x
         sudo chown -R www-data:www-data ${EC2_PATH}
         sudo chmod -R 755 ${EC2_PATH}
         cd ${EC2_PATH}
         composer install --no-dev
-        # Restart Apache or PHP-FPM if necessary
+        # Restart web server
         sudo systemctl restart apache2 || sudo systemctl restart nginx
         EOF
