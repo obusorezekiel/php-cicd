@@ -21,7 +21,6 @@ jobs:
         # Create SSH key file in a temp
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${{ runner.temp }}/id_rsa"
         chmod 600 "${{ runner.temp }}/id_rsa"
-        ls -l "${{ runner.temp }}"  # Debugging: list files to confirm id_rsa creation
 
     - name: Test SSH connection
       env:
