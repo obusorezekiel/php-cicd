@@ -49,7 +49,7 @@ jobs:
             echo ".env file already exists, skipping creation."
           fi
       
-          # Set permissions for the deployment directory
+          # Set permissions for the deployment
           sudo chown -R www-data:www-data ${EC2_PATH}
           sudo chmod -R 755 ${EC2_PATH}
           
