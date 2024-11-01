@@ -18,10 +18,10 @@ jobs:
 
     - name: Set up SSH key
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ls -l ~/.ssh  # Debugging: list files in .ssh to confirm id_rsa creation
+        # Create SSH key file in a temp directory
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${{ runner.temp }}/id_rsa"
+        chmod 600 "${{ runner.temp }}/id_rsa"
+        ls -l "${{ runner.temp }}"  # Debugging: list files to confirm id_rsa creation
 
     - name: Test SSH connection
       env:
@@ -29,7 +29,7 @@ jobs:
         EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
         echo "Testing SSH connection to EC2..."
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo 'SSH connection successful'"
+        ssh -i "${{ runner.temp }}/id_rsa" -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "echo 'SSH connection successful'"
 
     - name: Deploy application to EC2
       env:
@@ -43,11 +43,11 @@ jobs:
       run: |
         echo "Deploying application to EC2 instance..."
 
-        # Copy files to the EC2 instance
-        sudo rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
+        # Copy files to the EC2 instance using custom SSH key path
+        rsync -avz --exclude '.env' --exclude '.git' -e "ssh -i '${{ runner.temp }}/id_rsa' -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
 
         # Run deployment tasks on the EC2 instance
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
+        ssh -i "${{ runner.temp }}/id_rsa" -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
           if [ ! -f ${EC2_PATH}/.env ]; then
             cp ${EC2_PATH}/.env.example ${EC2_PATH}/.env
             echo "DB_HOST=${DB_HOST}" >> ${EC2_PATH}/.env
