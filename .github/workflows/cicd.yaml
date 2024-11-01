@@ -1,4 +1,4 @@
-name: Deploy to EC2 with SSH Key Debug
+name: Deploy to EC2
 
 on:
   push:
@@ -13,60 +13,53 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Prepare SSH Key
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      run: |
-        # Create SSH directory
-        mkdir -p ~/.ssh
-        
-        # Ensure correct key format - strip any potential extra text
-        echo "$SSH_PRIVATE_KEY" | sed -e 's/^[[:space:]"]*//' -e 's/[[:space:]"]*$//' > ~/.ssh/id_rsa
-        
-        # Set strict permissions
-        chmod 600 ~/.ssh/id_rsa
-        
-        # Debug: Show key details (without revealing content)
-        ssh-keygen -lf ~/.ssh/id_rsa || echo "Key validation failed"
-
     - name: Install dependencies
       run: composer install
 
-    - name: Test SSH Connection
-      env:
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        EC2_USER: ${{ secrets.EC2_USER }}
-      run: |
-        # Verbose SSH connection test
-        ssh -vvv \
-            -o StrictHostKeyChecking=no \
-            -i ~/.ssh/id_rsa \
-            ${EC2_USER}@${EC2_HOST} exit
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Deploy application to EC2
       env:
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USER: ${{ secrets.EC2_USER }}
         EC2_PATH: ${{ secrets.EC2_PATH }}
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
         echo "Deploying application to EC2 instance..."
-
-        # Use explicit key file in rsync and ssh commands
-        sudo rsync -avz \
-            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
-            --exclude '.env' \
-            --exclude '.git' \
-            ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
-
-        # Deploy commands with explicit key
-        ssh -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            ${EC2_USER}@${EC2_HOST} << EOF
-        set -x
-        sudo chown -R www-data:www-data ${EC2_PATH}
-        sudo chmod -R 755 ${EC2_PATH}
-        cd ${EC2_PATH}
-        composer install --no-dev
-        # Restart web server
-        sudo systemctl restart apache2 || sudo systemctl restart nginx
-        EOF
+      
+        # Copy files to the EC2 instance
+        sudo rsync -avz --exclude '.env' --exclude '.git' -e "ssh -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
+      
+        # Run deployment tasks on the EC2 instance
+        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << EOF
+    
+        if [ ! -f ${EC2_PATH}/.env ]; then
+            cp ${EC2_PATH}/.env.example ${EC2_PATH}/.env
+            echo "DB_HOST=${DB_HOST}" >> ${EC2_PATH}/.env
+            echo "DB_NAME=${DB_NAME}" >> ${EC2_PATH}/.env
+            echo "DB_USER=${DB_USER}" >> ${EC2_PATH}/.env
+            echo "DB_PASSWORD=${DB_PASSWORD}" >> ${EC2_PATH}/.env
+          else
+            echo ".env file already exists, skipping creation."
+          fi
+      
+          # Set permissions for the deployment directory
+          sudo chown -R www-data:www-data ${EC2_PATH}
+          sudo chmod -R 755 ${EC2_PATH}
+          
+          # Change to the application directory
+          cd ${EC2_PATH}
+          
+          # Install dependencies with Composer
+          composer install --no-dev
+          
+          # Restart Apache or PHP-FPM if necessary (depending on your server setup)
+          sudo systemctl restart apache2
+          EOF
+      
