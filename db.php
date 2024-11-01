@@ -1,8 +1,17 @@
 <?php
-$DB_HOST = 'localhost';      // Replace with your host
-$DB_NAME = 'my_db';  // Replace with your database name
-$DB_USER = 'root';  // Replace with your username
-$DB_PASSWORD = ''; // Replace with your password
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Dotenv\Dotenv;
+
+// Load environment variables from .env file
+$dotenv = Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+// Database credentials from .env
+$DB_HOST = $_ENV['DB_HOST'];
+$DB_NAME = $_ENV['DB_NAME'];
+$DB_USER = $_ENV['DB_USER'];
+$DB_PASSWORD = $_ENV['DB_PASSWORD'];
 
 // Database connection
 $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASSWORD, $DB_NAME);
