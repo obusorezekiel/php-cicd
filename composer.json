@@ -1,0 +1,12 @@
+{
+    "name": "yourname/php-crud-app",
+    "description": "A simple PHP CRUD application",
+    "require": {
+        "vlucas/phpdotenv": "^5.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
