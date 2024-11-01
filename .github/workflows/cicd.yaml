@@ -52,7 +52,7 @@ jobs:
         echo "Deploying application to EC2 instance..."
 
         # Use explicit key file in rsync and ssh commands
-        rsync -avz \
+        sudo rsync -avz \
             -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
             --exclude '.env' \
             --exclude '.git' \
